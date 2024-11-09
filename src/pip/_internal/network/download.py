@@ -113,9 +113,9 @@ def _aria2_download(
     filedir = os.path.dirname(filepath)
     os.makedirs(filedir, exist_ok=True)
     if not show_progress:
-        mini_bash(f'aria2c -q -c -x {NJ} -d "{filedir}" -o {filename} "{resp.url}"')
+        mini_bash(f'aria2c -q -c -x {NJ} -d "{filedir}" -o {filename} "{resp.url}"', capture_output=False)
     else:
-        mini_bash(f'aria2c    -c -x {NJ} -d "{filedir}" -o {filename} "{resp.url}"')
+        mini_bash(f'aria2c    -c -x {NJ} -d "{filedir}" -o {filename} "{resp.url}"', capture_output=False)
 
     return filepath
 
