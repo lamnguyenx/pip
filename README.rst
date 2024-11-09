@@ -1,5 +1,12 @@
-pip - The Python Package Installer
+pip - The Python Package Installer - Supercharged with ariac
 ==================================
+
+To download pip packages with X connections, just prefix
+your pip command with `NJ=X`.
+
+```
+NJ=8 pip install ...
+```
 
 .. |pypi-version| image:: https://img.shields.io/pypi/v/pip.svg
    :target: https://pypi.org/project/pip/

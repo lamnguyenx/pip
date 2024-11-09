@@ -20,6 +20,11 @@ from pip._internal.utils.misc import format_size, redact_auth_from_url, splitext
 
 logger = logging.getLogger(__name__)
 
+import traceback
+from mini_bash import mini_bash
+from booleanify import booleanify
+NJ = int(os.environ.get('NJ', 1))
+
 
 def _get_http_response_size(resp: Response) -> Optional[int]:
     try:
@@ -68,6 +73,52 @@ def _prepare_download(
 
     renderer = get_download_progress_renderer(bar_type=progress_bar, size=total_length)
     return renderer(chunks)
+
+
+def _aria2_download(
+    resp: Response,
+    link: Link,
+    progress_bar: str,
+    filepath:str,
+    filename:str,
+) -> str:
+    total_length = _get_http_response_size(resp)
+
+    if link.netloc == PyPI.file_storage_domain:
+        url = link.show_url
+    else:
+        url = link.url_without_fragment
+
+    logged_url = redact_auth_from_url(url)
+
+    if total_length:
+        logged_url = f"{logged_url} ({format_size(total_length)})"
+
+    if is_from_cache(resp):
+        logger.info("Using cached %s", logged_url)
+    else:
+        logger.info("Downloading %s", logged_url)
+
+    if logger.getEffectiveLevel() > logging.INFO:
+        show_progress = False
+    elif is_from_cache(resp):
+        show_progress = False
+    elif not total_length:
+        show_progress = True
+    elif total_length > (512 * 1024):
+        show_progress = True
+    else:
+        show_progress = False
+
+    filedir = os.path.dirname(filepath)
+    os.makedirs(filedir, exist_ok=True)
+    if not show_progress:
+        mini_bash(f'aria2c -q -c -x {NJ} -d "{filedir}" -o {filename} "{resp.url}"')
+    else:
+        mini_bash(f'aria2c    -c -x {NJ} -d "{filedir}" -o {filename} "{resp.url}"')
+
+    return filepath
+
 
 
 def sanitize_content_filename(filename: str) -> str:
@@ -143,10 +194,21 @@ class Downloader:
         filename = _get_http_response_filename(resp, link)
         filepath = os.path.join(location, filename)
 
-        chunks = _prepare_download(resp, link, self._progress_bar)
-        with open(filepath, "wb") as content_file:
-            for chunk in chunks:
-                content_file.write(chunk)
+        if NJ > 1:
+            _aria2_download(
+                resp=resp,
+                link=link,
+                progress_bar=self._progress_bar,
+                filepath=filepath,
+                filename=filename,
+            )
+
+        else:
+            chunks = _prepare_download(resp, link, self._progress_bar)
+            with open(filepath, "wb") as content_file:
+                for chunk in chunks:
+                    content_file.write(chunk)
+
         content_type = resp.headers.get("Content-Type", "")
         return filepath, content_type
 
@@ -179,9 +241,20 @@ class BatchDownloader:
             filename = _get_http_response_filename(resp, link)
             filepath = os.path.join(location, filename)
 
-            chunks = _prepare_download(resp, link, self._progress_bar)
-            with open(filepath, "wb") as content_file:
-                for chunk in chunks:
-                    content_file.write(chunk)
+            if NJ > 1:
+                _aria2_download(
+                    resp=resp,
+                    link=link,
+                    progress_bar=self._progress_bar,
+                    filepath=filepath,
+                    filename=filename,
+                )
+
+            else:
+                chunks = _prepare_download(resp, link, self._progress_bar)
+                with open(filepath, "wb") as content_file:
+                    for chunk in chunks:
+                        content_file.write(chunk)
+
             content_type = resp.headers.get("Content-Type", "")
             yield link, (filepath, content_type)

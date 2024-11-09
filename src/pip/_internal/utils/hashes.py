@@ -99,6 +99,7 @@ class Hashes:
 
     def check_against_path(self, path: str) -> None:
         with open(path, "rb") as file:
+            print('opening path:', path)
             return self.check_against_file(file)
 
     def has_one_of(self, hashes: Dict[str, str]) -> bool:
